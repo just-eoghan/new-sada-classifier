@@ -1,0 +1,57 @@
+# @package _global_
+
+defaults:
+  - override/ trainer: default.yaml
+  - override/ model:  da_frcnn_detection_model.yaml
+  - override/ datamodule: da_frcnn_datamodule.yaml
+  - override/ callbacks: default.yaml
+  - override/ logger: wandb # set logger here or use command line (e.g. `python run.py logger=wandb`)
+  - override/ log_dir: evaluation.yaml
+  - override/ experiment: null
+
+original_work_dir: ${hydra:runtime.cwd}
+
+data_dir: ${original_work_dir}/data
+
+print_config: True
+
+ignore_warnings: True
+
+seed: 100101101112115101101107046097105
+
+logger:
+  wandb:
+    log_model: False
+    project: ''
+    offline: True
+
+trainer:
+  accelerator: "gpu"
+  devices: [0]
+
+datamodule:
+  val_data_dir: ""
+  val_annotations_file: ""
+  val_batch_size: 2
+  num_classes: 2
+  image_width: 160
+  image_height: 120
+
+model:
+  lr: 0.0025
+  weight_decay: 0.0001
+  num_classes: 2
+  da_net:
+    num_classes: 2
+    backbone_out_channels: 256
+
+lr_finder: False
+batch_finder: False
+
+callbacks:
+  log_bounding_boxes:
+    _target_: src.callbacks.wandb_callbacks.LogBoundingBoxes
+
+ckpt_path: ""
+
+name: ""

@@ -1,0 +1,10 @@
+_target_: src.datamodules.frcnn_datamodule.FrcnnDatamodule
+
+train_data_dir: "${data_dir}/griffith/"
+val_data_dir: "${data_dir}/griffith/"
+batch_size: 2
+num_workers: 0
+pin_memory: False
+num_classes: 6
+image_width: 160
+image_height: 120

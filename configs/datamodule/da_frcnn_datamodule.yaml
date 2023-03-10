@@ -1,0 +1,15 @@
+_target_: src.datamodules.da_frcnn_datamodule.DaFrcnnDatamodule
+
+source_data_dir: "${data_dir}/flir/train"
+source_annotations_file: "${data_dir}/flir/train_annotations.json"
+target_data_dir: "${data_dir}/thomas/train"
+target_annotations_file: "${data_dir}/thomas/train_annotations.json"
+val_data_dir: "${data_dir}/thomas/val"
+val_annotations_file: "${data_dir}/thomas/val_annotations.json"
+train_batch_size: 2
+val_batch_size: 2
+num_workers: 0
+pin_memory: False
+num_classes: 2
+image_width: 160
+image_height: 120
