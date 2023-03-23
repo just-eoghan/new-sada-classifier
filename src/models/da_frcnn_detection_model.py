@@ -8,6 +8,8 @@ from bisect import bisect_right
 from src.models.modules.masking import Masking
 from src.models.modules.teacher import EMATeacher
 
+import lpips
+
 def process_pred2label(target_output, threshold=0.7):
     masks = []
     pseudo_labels_list = []
@@ -76,6 +78,16 @@ class DaFrcnnDetectionModel(LightningModule):
         source_images, source_targets, _ = batch[0]
         target_images, target_targets, _ = batch[1]
 
+        src_im = source_images[0].unsqueeze(0)
+        tgt_im = target_images[0].unsqueeze(0)
+
+        norm_src_im = 2 * (src_im - src_im.min()) / (src_im.max() - src_im.min()) - 1
+        norm_tgt_im = 2 * (tgt_im - tgt_im.min()) / (tgt_im.max() - tgt_im.min()) - 1
+
+        lpips_loss = lpips.LPIPS(net='vgg', verbose=False).cuda()
+        lpips_loss.eval()
+        dist = lpips_loss.forward(norm_src_im, norm_tgt_im)
+
         masked_target_images = self.masking(torch.stack(target_images))
         self.teacher.update_weights(self.model, self.global_step)
         target_output = self.teacher(target_images)
@@ -109,7 +121,7 @@ class DaFrcnnDetectionModel(LightningModule):
                 else:  # supervised loss
                     loss_dict[key] = record_dict[key] * 1
 
-        loss = sum(loss for loss in loss_dict.values())
+        loss = sum(loss for loss in loss_dict.values()) * dist.max()
 
         if 'loss_classifier_mask' in loss_dict:
             self.log("train/loss_classifier_mask", loss_dict['loss_classifier_mask'], on_step=True, on_epoch=False, prog_bar=False)

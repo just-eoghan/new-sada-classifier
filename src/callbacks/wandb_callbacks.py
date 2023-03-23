@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from typing import List
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import seaborn as sn
 import torch

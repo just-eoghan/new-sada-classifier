@@ -3,7 +3,6 @@ import os.path
 from typing import Any, Callable, List, Optional, Tuple
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
 from PIL import Image
 from torchvision.datasets.vision import VisionDataset
 from torchvision.ops import box_convert

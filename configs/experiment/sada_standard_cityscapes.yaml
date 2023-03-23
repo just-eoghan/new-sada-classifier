@@ -8,7 +8,7 @@ defaults:
   - override /mode: exp.yaml
   - override /logger: wandb.yaml
 
-name: "mic_fixed_sada_cityscapes"
+name: "scaled_loss"
 
 seed: 100101101112115101101107046097105
 
