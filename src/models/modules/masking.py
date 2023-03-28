@@ -90,11 +90,10 @@ def gaussian_blur(blur, data):
     return data
 
 class Masking(nn.Module):
-    def __init__(self, block_size, ratio, color_jitter_s, color_jitter_p, blur, mean, std):
+    def __init__(self, block_size, color_jitter_s, color_jitter_p, blur, mean, std):
         super(Masking, self).__init__()
 
         self.block_size = block_size
-        self.ratio = ratio
 
         self.augmentation_params = None
         if (color_jitter_p > 0 and color_jitter_s > 0) or blur:
@@ -109,7 +108,7 @@ class Masking(nn.Module):
             }
 
     @torch.no_grad()
-    def forward(self, img: Tensor):
+    def forward(self, img: Tensor, ratio):
         img = img.clone()
         B, _, H, W = img.shape
 
@@ -118,7 +117,7 @@ class Masking(nn.Module):
 
         mshape = B, 1, round(H / self.block_size), round(W / self.block_size)
         input_mask = torch.rand(mshape, device=img.device)
-        input_mask = (input_mask > self.ratio).float()
+        input_mask = (input_mask > ratio).float()
         input_mask = resize(input_mask, size=(H, W))
         masked_img = img * input_mask
 

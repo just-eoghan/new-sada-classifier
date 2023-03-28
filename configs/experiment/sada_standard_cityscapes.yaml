@@ -8,7 +8,7 @@ defaults:
   - override /mode: exp.yaml
   - override /logger: wandb.yaml
 
-name: "scaled_loss"
+name: "dmics_v3"
 
 seed: 100101101112115101101107046097105
 

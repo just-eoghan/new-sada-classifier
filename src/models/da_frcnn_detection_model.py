@@ -44,7 +44,7 @@ class DaFrcnnDetectionModel(LightningModule):
         weight_decay: float = 0.0005,
         momentum: float = 0.9,
         trainable_backbone_layers: int = 0,
-        lr_scheduler: bool = True
+        lr_scheduler: bool = True,
     ):
         super().__init__()
 
@@ -58,7 +58,6 @@ class DaFrcnnDetectionModel(LightningModule):
 
         self.masking = Masking(
             block_size=32,
-            ratio=0.5,
             color_jitter_s=0.2,
             color_jitter_p=0.2,
             blur=True,
@@ -88,7 +87,28 @@ class DaFrcnnDetectionModel(LightningModule):
         lpips_loss.eval()
         dist = lpips_loss.forward(norm_src_im, norm_tgt_im)
 
-        masked_target_images = self.masking(torch.stack(target_images))
+        distance = dist.item()
+
+        min = 0.5301851034164429
+        max = 0.7199839353561401
+
+        distance_norm = (distance - min) / (max-min)
+
+        if distance_norm >= 0.8:
+            mask_ratio = 0.2
+        elif distance_norm <= 0.2:
+            mask_ratio = 0.8
+        else:
+            mask_ratio = 1 - distance_norm
+
+        # if ratio_norm > 0.8:
+        #     ratio_norm = 0.2
+        # elif ratio_norm < 0.2:
+        #     ratio_norm = 0.7
+        # else:
+        #     ratio_norm = ((-1 * ratio_norm) * 0.5) + 0.6
+
+        masked_target_images = self.masking(torch.stack(target_images), mask_ratio)
         self.teacher.update_weights(self.model, self.global_step)
         target_output = self.teacher(target_images)
         target_pseudo_labels, pseudo_masks = process_pred2label(target_output, threshold=0.8)
@@ -121,7 +141,7 @@ class DaFrcnnDetectionModel(LightningModule):
                 else:  # supervised loss
                     loss_dict[key] = record_dict[key] * 1
 
-        loss = sum(loss for loss in loss_dict.values()) * dist.max()
+        loss = sum(loss for loss in loss_dict.values())
 
         if 'loss_classifier_mask' in loss_dict:
             self.log("train/loss_classifier_mask", loss_dict['loss_classifier_mask'], on_step=True, on_epoch=False, prog_bar=False)
