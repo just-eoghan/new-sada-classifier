@@ -8,7 +8,7 @@ defaults:
   - override /mode: exp.yaml
   - override /logger: wandb.yaml
 
-name: "dmics_v3"
+name: "dmics_v11_3070_normd_new_thresh"
 
 seed: 100101101112115101101107046097105
 

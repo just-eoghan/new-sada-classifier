@@ -7,8 +7,18 @@ from bisect import bisect_right
 
 from src.models.modules.masking import Masking
 from src.models.modules.teacher import EMATeacher
-
+from split_image import split_image
 import lpips
+
+def calc_quadrant_masking(max_distance_values, image_mask=0.5, exp_scaler=8):
+  max_distance_sorted = sorted(max_distance_values, reverse=True)
+  scaled_distances = [pow(x,exp_scaler) for x in max_distance_sorted]
+  proportion = [ (x/sum(scaled_distances)) for x in scaled_distances]
+  q_mask = [image_mask * x for x in proportion]
+  masking_dict = {}
+  for idx,x in enumerate(proportion):
+    masking_dict[max_distance_sorted[idx]] = sorted(q_mask)[idx]
+  return [round(masking_dict[x] *len(max_distance_values), 3) for x in max_distance_values]
 
 def process_pred2label(target_output, threshold=0.7):
     masks = []
@@ -83,32 +93,39 @@ class DaFrcnnDetectionModel(LightningModule):
         norm_src_im = 2 * (src_im - src_im.min()) / (src_im.max() - src_im.min()) - 1
         norm_tgt_im = 2 * (tgt_im - tgt_im.min()) / (tgt_im.max() - tgt_im.min()) - 1
 
+        src_chunks = torch.split(norm_src_im, split_size_or_sections=800, dim=3)  # split along width
+        src_chunks = [torch.split(chunk, split_size_or_sections=400, dim=2) for chunk in src_chunks]
+
+        src_flattened_chunks = [tensor for sublist in src_chunks for tensor in sublist]
+        src_final_chunks = src_flattened_chunks[:4]  # select the first 4 tensors
+
+        tgt_chunks = torch.split(norm_tgt_im, split_size_or_sections=800, dim=3)  # split along width
+        tgt_chunks = [torch.split(chunk, split_size_or_sections=400, dim=2) for chunk in tgt_chunks]
+
+        tgt_flattened_chunks = [tensor for sublist in tgt_chunks for tensor in sublist]
+        tgt_final_chunks = tgt_flattened_chunks[:4]  # select the first 4 tensors
+
+        l = tgt_final_chunks[0]
+        m = tgt_final_chunks[1]
+        n = tgt_final_chunks[2]
+        o = tgt_final_chunks[3]
+
         lpips_loss = lpips.LPIPS(net='vgg', verbose=False).cuda()
         lpips_loss.eval()
-        dist = lpips_loss.forward(norm_src_im, norm_tgt_im)
 
-        distance = dist.item()
+        max_dists = [0] * 4
 
-        min = 0.5301851034164429
-        max = 0.7199839353561401
+        for si, qs in enumerate(src_final_chunks):
+            for ti, qt in enumerate(tgt_final_chunks):
+                distance = lpips_loss.forward(qs, qt)
+                if(ti == 0):
+                    max_dists[si] = distance.item()
+                elif(distance.item() > max_dists[si]):
+                    max_dists[si] = distance.item()
 
-        distance_norm = (distance - min) / (max-min)
+        masking = calc_quadrant_masking(max_dists)
+        masked_target_images = self.masking(tgt_final_chunks, masking)
 
-        if distance_norm >= 0.8:
-            mask_ratio = 0.2
-        elif distance_norm <= 0.2:
-            mask_ratio = 0.8
-        else:
-            mask_ratio = 1 - distance_norm
-
-        # if ratio_norm > 0.8:
-        #     ratio_norm = 0.2
-        # elif ratio_norm < 0.2:
-        #     ratio_norm = 0.7
-        # else:
-        #     ratio_norm = ((-1 * ratio_norm) * 0.5) + 0.6
-
-        masked_target_images = self.masking(torch.stack(target_images), mask_ratio)
         self.teacher.update_weights(self.model, self.global_step)
         target_output = self.teacher(target_images)
         target_pseudo_labels, pseudo_masks = process_pred2label(target_output, threshold=0.8)
@@ -160,6 +177,8 @@ class DaFrcnnDetectionModel(LightningModule):
         self.log("train/loss", log_dict, on_step=True, on_epoch=False, prog_bar=False)
         self.log("trian/loss_sum", loss, on_step=True, on_epoch=False, prog_bar=False)
         return loss
+
+
 
     def validation_step(self, batch: Any, batch_idx: int):
 
