@@ -124,7 +124,7 @@ class DaFrcnnDetectionModel(LightningModule):
                     max_dists[si] = distance.item()
 
         masking = calc_quadrant_masking(max_dists)
-        masked_target_images = self.masking(tgt_final_chunks, masking)
+        masked_target_images = self.masking(norm_tgt_im,tgt_final_chunks, masking)
 
         self.teacher.update_weights(self.model, self.global_step)
         target_output = self.teacher(target_images)

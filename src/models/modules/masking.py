@@ -108,13 +108,14 @@ class Masking(nn.Module):
             }
 
     @torch.no_grad()
-    def forward(self, image_quads, quadrant_masks):
+    def forward(self, image, image_quads, quadrant_masks):
         masked_image_parts = []
+
+        image = image.clone()
+
         for img, mask_size in zip(image_quads, quadrant_masks):
             img = img.clone()
             B, _, H, W = img.shape
-            if self.augmentation_params is not None:
-                img = strong_transform(self.augmentation_params, data=img.clone())
             mshape = B, 1, round(H / self.block_size), round(W / self.block_size)
             input_mask = torch.rand(mshape, device=img.device)
 
@@ -126,13 +127,19 @@ class Masking(nn.Module):
 
             input_mask = (input_mask > mask_size).float()
             input_mask = resize(input_mask, size=(H, W))
-            masked_img = img * input_mask
-            masked_image_parts.append(masked_img)
+            # masked_img = img * input_mask
+            masked_image_parts.append(input_mask)
         # find a way to stitch back together
         # concatenate top-left and top-right tensors horizontally
-        top_half = torch.cat([masked_image_parts[0], masked_image_parts[2]], dim=3)
+        top_half_mask = torch.cat([masked_image_parts[0], masked_image_parts[2]], dim=3)
         # concatenate bottom-left and bottom-right tensors horizontally
-        bottom_half = torch.cat([masked_image_parts[1], masked_image_parts[3]], dim=3)
+        bottom_half_mask = torch.cat([masked_image_parts[1], masked_image_parts[3]], dim=3)
         # concatenate the top and bottom halves vertically
-        full_img = torch.cat([top_half, bottom_half], dim=2)
+        full_img_mask = torch.cat([top_half_mask, bottom_half_mask], dim=2)
+
+        if self.augmentation_params is not None:
+            image = strong_transform(self.augmentation_params, data=image.clone())
+
+        full_img = image * full_img_mask
+
         return full_img
